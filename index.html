@@ -101,20 +101,25 @@
         }
 
         .delete-btn, .renew-btn, .edit-btn {
-            background-color: red;
-            color: white;
             border: none;
             cursor: pointer;
             padding: 5px 10px;
             margin-left: 5px;
         }
 
+        .delete-btn {
+            background-color: red;
+            color: white;
+        }
+
         .renew-btn {
             background-color: green;
+            color: white;
         }
 
         .edit-btn {
             background-color: orange;
+            color: white;
         }
 
         .delete-btn:hover {
@@ -129,30 +134,27 @@
             background-color: darkorange;
         }
 
-        .renew-btn:disabled {
-            background-color: grey;
-            cursor: not-allowed;
+        .result-valid {
+            color: green;
+            font-weight: bold;
         }
 
-        .checker-section input {
-            margin-bottom: 10px;
-        }
-
-        .checker-section p {
+        .result-fake {
+            color: red;
             font-weight: bold;
         }
     </style>
 </head>
 <body>
     <div class="navbar">
-        <a href="#" onclick="showSection('form')">Ticket Registration</a>
-        <a href="#" onclick="showSection('checker')">Ticket Checker</a>
+        <a href="#" onclick="showSection('form-section')">Ticket Registration</a>
+        <a href="#" onclick="showSection('checker-section')">Ticket Checker</a>
+        <a href="#" onclick="showSection('tickets-section')">Manage Tickets</a>
     </div>
 
     <div class="container">
-        <h1>Game Center Ticket Management</h1>
-
-        <div class="form-section active">
+        <div id="form-section" class="form-section active">
+            <h1>Game Center Ticket Management</h1>
             <h2 id="formTitle">Add Ticket</h2>
             <form id="ticketForm">
                 <label for="userName">User Name:</label>
@@ -169,9 +171,10 @@
 
                 <button type="submit">Add Ticket</button>
             </form>
+            <div id="ticketSummary"></div>
         </div>
 
-        <div class="tickets-section">
+        <div id="tickets-section" class="tickets-section">
             <h2>Tickets</h2>
             <table>
                 <thead>
@@ -189,14 +192,14 @@
             </table>
         </div>
 
-        <div class="checker-section">
-            <h2>Ticket Checker</h2>
+        <div id="checker-section" class="checker-section">
+            <h2>Check Ticket</h2>
             <form id="ticketCheckerForm">
-                <label for="checkTicketId">Enter Ticket ID to Check:</label>
+                <label for="checkTicketId">Ticket ID:</label>
                 <input type="text" id="checkTicketId" required>
-                <button type="button" onclick="checkTicket()">Check Ticket</button>
+                <button type="button" onclick="checkTicket()">Check</button>
             </form>
-            <p id="checkerResult"></p>
+            <div id="checkerResult"></div>
         </div>
     </div>
 
@@ -209,11 +212,11 @@
 
         document.getElementById('ticketForm').addEventListener('submit', function(event) {
             event.preventDefault();
-            
+
             const userName = document.getElementById('userName').value;
             const ticketId = document.getElementById('ticketId').value;
             const ticketType = document.getElementById('ticketType').value;
-            
+
             if (editingTicketId) {
                 updateTicket(userName, ticketId, ticketType);
             } else {
@@ -221,21 +224,7 @@
             }
         });
 
-        document.getElementById('ticketCheckerForm').addEventListener('submit', function(event) {
-            event.preventDefault();
-            checkTicket();
-        });
-
-        function showSection(section) {
-            document.querySelector('.form-section').classList.remove('active');
-            document.querySelector('.tickets-section').classList.remove('active');
-            document.querySelector('.checker-section').classList.remove('active');
-            document.querySelector(`.${section}-section`).classList.add('active');
-        }
-
         function addTicket(userName, ticketId, ticketType) {
-            const ticketList = document.getElementById('ticketList');
-            
             const issueDate = new Date();
             let expirationDate;
             let status = '';
@@ -243,7 +232,6 @@
             if (ticketType === 'client') {
                 expirationDate = new Date(issueDate);
                 expirationDate.setFullYear(expirationDate.getFullYear() + 3);
-
                 status = getTicketStatus(expirationDate);
             } else {
                 status = `<span class="valid">No Expiry</span>`;
@@ -259,6 +247,7 @@
 
             saveTicketToLocalStorage(ticket);
             appendTicketToTable(ticket, status);
+            showTicketSummary(ticket, status);
         }
 
         function updateTicket(userName, ticketId, ticketType) {
@@ -285,7 +274,7 @@
                 const row = document.querySelector(`[data-ticket-id="${editingTicketId}"]`);
                 row.querySelector('td:nth-child(1)').textContent = userName;
                 row.querySelector('td:nth-child(2)').textContent = ticketId;
-                row.querySelector('td:nth-child(3)').textContent = ticketType.charAt(0).toUpperCase() + ticketType.slice(1);
+                row.querySelector('td:nth-child(3)').textContent = ticket.ticketType.charAt(0).toUpperCase() + ticket.ticketType.slice(1);
                 row.querySelector('td:nth-child(4)').innerHTML = ticket.status;
 
                 editingTicketId = null;
@@ -296,11 +285,15 @@
 
         function getTicketStatus(expirationDate) {
             const now = new Date();
-            if (expirationDate > now) {
-                const timeLeft = calculateTimeLeft(expirationDate);
-                return `<span class="valid">Valid - Expires in ${timeLeft}</span>`;
+            if (expirationDate) {
+                if (expirationDate > now) {
+                    const timeLeft = calculateTimeLeft(expirationDate);
+                    return `<span class="valid">Valid - Expires in ${timeLeft}</span>`;
+                } else {
+                    return `<span class="expired">Expired</span>`;
+                }
             } else {
-                return `<span class="expired">Expired</span>`;
+                return `<span class="valid">No Expiry</span>`;
             }
         }
 
@@ -309,9 +302,8 @@
             const row = document.createElement('tr');
             row.setAttribute('data-ticket-id', ticket.ticketId);
 
-            const canRenew = new Date(ticket.expirationDate) < new Date();
-            const renewButton = ticket.ticketType === 'client' ? 
-                `<button class="renew-btn" onclick="renewTicket('${ticket.ticketId}')" ${!canRenew ? 'disabled' : ''}>Renew</button>` : '';
+            const canRenew = ticket.ticketType === 'client' && new Date(ticket.expirationDate) < new Date();
+            const renewButton = ticket.ticketType === 'client' ? `<button class="renew-btn" onclick="renewTicket('${ticket.ticketId}')" ${canRenew ? '' : 'disabled'}>Renew</button>` : '';
 
             row.innerHTML = `
                 <td>${ticket.userName}</td>
@@ -359,24 +351,33 @@
             const ticket = tickets.find(ticket => ticket.ticketId === ticketId);
 
             if (ticket) {
-                const newExpirationDate = new Date();
-                newExpirationDate.setFullYear(newExpirationDate.getFullYear() + 3);
+                const now = new Date();
+                const issueDate = new Date(ticket.issueDate);
+                const expirationDate = new Date(ticket.expirationDate);
 
-                ticket.expirationDate = newExpirationDate;
-                ticket.status = getTicketStatus(newExpirationDate);
+                const diffYears = (now.getFullYear() - issueDate.getFullYear());
+                if (diffYears >= 3) {
+                    const newExpirationDate = new Date(expirationDate);
+                    newExpirationDate.setFullYear(newExpirationDate.getFullYear() + 3);
 
-                localStorage.setItem('tickets', JSON.stringify(tickets));
+                    ticket.expirationDate = newExpirationDate;
+                    ticket.status = getTicketStatus(newExpirationDate);
 
-                const row = document.querySelector(`[data-ticket-id="${ticketId}"]`);
-                const statusCell = row.querySelector('td:nth-child(4)');
-                const actionCell = row.querySelector('td:nth-child(5)');
+                    localStorage.setItem('tickets', JSON.stringify(tickets));
 
-                statusCell.innerHTML = ticket.status;
-                actionCell.innerHTML = `
-                    <button class="renew-btn" onclick="renewTicket('${ticket.ticketId}')" ${new Date(ticket.expirationDate) < new Date() ? 'disabled' : ''}>Renew</button>
-                    <button class="edit-btn" onclick="editTicket('${ticket.ticketId}')">Edit</button>
-                    <button class="delete-btn" onclick="deleteTicket('${ticket.ticketId}')">Delete</button>
-                `;
+                    const row = document.querySelector(`[data-ticket-id="${ticketId}"]`);
+                    const statusCell = row.querySelector('td:nth-child(4)');
+                    const actionCell = row.querySelector('td:nth-child(5)');
+
+                    statusCell.innerHTML = ticket.status;
+                    actionCell.innerHTML = `
+                        <button class="renew-btn" onclick="renewTicket('${ticket.ticketId}')" ${new Date(ticket.expirationDate) < new Date() ? 'disabled' : ''}>Renew</button>
+                        <button class="edit-btn" onclick="editTicket('${ticket.ticketId}')">Edit</button>
+                        <button class="delete-btn" onclick="deleteTicket('${ticket.ticketId}')">Delete</button>
+                    `;
+                } else {
+                    alert('Tickets can only be renewed if at least 3 years have passed since the issue date.');
+                }
             }
         }
 
@@ -390,19 +391,6 @@
                 document.getElementById('ticketType').value = ticket.ticketType;
                 document.getElementById('formTitle').textContent = 'Edit Ticket';
                 editingTicketId = ticketId;
-            }
-        }
-
-        function checkTicket() {
-            const ticketId = document.getElementById('checkTicketId').value;
-            const tickets = JSON.parse(localStorage.getItem('tickets')) || [];
-            const ticket = tickets.find(ticket => ticket.ticketId === ticketId);
-
-            if (ticket) {
-                const status = ticket.ticketType === 'client' ? getTicketStatus(new Date(ticket.expirationDate)) : `<span class="valid">No Expiry</span>`;
-                document.getElementById('checkerResult').innerHTML = `<p>Ticket ID: ${ticket.ticketId}</p><p>User Name: ${ticket.userName}</p><p>Type: ${ticket.ticketType.charAt(0).toUpperCase() + ticket.ticketType.slice(1)}</p><p>Status: ${status}</p>`;
-            } else {
-                document.getElementById('checkerResult').innerHTML = `<p class="expired">Ticket ID ${ticketId} not found.</p>`;
             }
         }
 
@@ -420,6 +408,44 @@
                 return `${months} months, ${days % 30} days`;
             } else {
                 return `${days} days`;
+            }
+        }
+
+        function showSection(sectionId) {
+            document.querySelectorAll('.form-section, .tickets-section, .checker-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            document.getElementById(sectionId).classList.add('active');
+        }
+
+        function showTicketSummary(ticket, status) {
+            const summaryDiv = document.getElementById('ticketSummary');
+            summaryDiv.innerHTML = `
+                <h3>Ticket Registered Successfully</h3>
+                <p><strong>User Name:</strong> ${ticket.userName}</p>
+                <p><strong>Ticket ID:</strong> ${ticket.ticketId}</p>
+                <p><strong>Type:</strong> ${ticket.ticketType.charAt(0).toUpperCase() + ticket.ticketType.slice(1)}</p>
+                <p><strong>Status:</strong> ${status}</p>
+            `;
+        }
+
+        function checkTicket() {
+            const ticketId = document.getElementById('checkTicketId').value;
+            const tickets = JSON.parse(localStorage.getItem('tickets')) || [];
+            const ticket = tickets.find(ticket => ticket.ticketId === ticketId);
+            const resultDiv = document.getElementById('checkerResult');
+
+            if (ticket) {
+                const status = ticket.ticketType === 'client' ? getTicketStatus(new Date(ticket.expirationDate)) : `<span class="valid">No Expiry</span>`;
+                resultDiv.innerHTML = `
+                    <p class="result-valid">Valid Ticket</p>
+                    <p><strong>User Name:</strong> ${ticket.userName}</p>
+                    <p><strong>Ticket ID:</strong> ${ticket.ticketId}</p>
+                    <p><strong>Type:</strong> ${ticket.ticketType.charAt(0).toUpperCase() + ticket.ticketType.slice(1)}</p>
+                    <p><strong>Status:</strong> ${status}</p>
+                `;
+            } else {
+                resultDiv.innerHTML = `<p class="result-fake">Fake Ticket</p>`;
             }
         }
     </script>
