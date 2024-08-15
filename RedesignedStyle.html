@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Center Ticket Management</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+
+        .navbar {
+            background-color: #007bff;
+            padding: 15px;
+            color: white;
+            text-align: center;
+        }
+
+        .navbar a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            margin: 0 10px;
+            font-size: 18px;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        .navbar a:hover {
+            background-color: #0056b3;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        h1, h2 {
+            color: #007bff;
+            margin-bottom: 20px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        label {
+            font-weight: bold;
+        }
+
+        input, select, button {
+            padding: 12px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .expired {
+            color: red;
+        }
+
+        .valid {
+            color: green;
+        }
+
+        .actions button {
+            margin: 0 5px;
+            padding: 5px 10px;
+            font-size: 14px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .edit-btn {
+            background-color: orange;
+            color: white;
+        }
+
+        .edit-btn:hover {
+            background-color: darkorange;
+        }
+
+        .delete-btn {
+            background-color: red;
+            color: white;
+        }
+
+        .delete-btn:hover {
+            background-color: darkred;
+        }
+
+        .renew-btn {
+            background-color: green;
+            color: white;
+        }
+
+        .renew-btn:hover {
+            background-color: darkgreen;
+        }
+
+        .actions button:disabled {
+            background-color: grey;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <a href="#register">Register Ticket</a>
+        <a href="#check">Check Ticket</a>
+    </div>
+
+    <div class="container">
+        <h1>Game Center Ticket Management</h1>
+
+        <div id="register" class="form-section">
+            <h2>Add Ticket</h2>
+            <form id="ticketForm">
+                <label for="userName">User Name:</label>
+                <input type="text" id="userName" required>
+
+                <label for="ticketId">Ticket ID:</label>
+                <input type="text" id="ticketId" required>
+
+                <label for="ticketType">Ticket Type:</label>
+                <select id="ticketType" required>
+                    <option value="client">Client</option>
+                    <option value="worker">Worker</option>
+                </select>
+
+                <button type="submit">Add Ticket</button>
+            </form>
+        </div>
+
+        <div id="check" class="tickets-section">
+            <h2>Tickets</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>User Name</th>
+                        <th>Ticket ID</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="ticketList">
+                    <!-- Ticket rows will be dynamically added here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let editingTicketId = null;
+
+        window.onload = function() {
+            loadTicketsFromLocalStorage();
+        };
+
+        document.getElementById('ticketForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            const userName = document.getElementById('userName').value;
+            const ticketId = document.getElementById('ticketId').value;
+            const ticketType = document.getElementById('ticketType').value;
+
+            if (editingTicketId) {
+                updateTicket(userName, ticketId, ticketType);
+            } else {
+                addTicket(userName, ticketId, ticketType);
+            }
+        });
+
+        function addTicket(userName, ticketId, ticketType) {
+            const ticketList = document.getElementById('ticketList');
+
+            const issueDate = new Date();
+            let expirationDate;
+            let status = '';
+
+            if (ticketType === 'client') {
+                expirationDate = new Date(issueDate);
+                expirationDate.setFullYear(expirationDate.getFullYear() + 3);
+
+                status = getTicketStatus(expirationDate);
+            } else {
+                status = `<span class="valid">No Expiry</span>`;
+            }
+
+            const ticket = {
+                userName: userName,
+                ticketId: ticketId,
+                ticketType: ticketType,
+                issueDate: issueDate,
+                expirationDate: expirationDate ? expirationDate : null
+            };
+
+            saveTicketToLocalStorage(ticket);
+            appendTicketToTable(ticket, status);
+        }
+
+        function updateTicket(userName, ticketId, ticketType) {
+            let tickets = JSON.parse(localStorage.getItem('tickets')) || [];
+            const index = tickets.findIndex(ticket => ticket.ticketId === editingTicketId);
+
+            if (index !== -1) {
+                const ticket = tickets[index];
+                ticket.userName = userName;
+                ticket.ticketId = ticketId;
+                ticket.ticketType = ticketType;
+                if (ticket.ticketType === 'client') {
+                    const newExpirationDate = new Date(ticket.issueDate);
+                    newExpirationDate.setFullYear(newExpirationDate.getFullYear() + 3);
+                    ticket.expirationDate = newExpirationDate;
+                } else {
+                    ticket.expirationDate = null;
+                }
+                ticket.status = ticket.ticketType === 'client' ? getTicketStatus(ticket.expirationDate) : `<span class="valid">No Expiry</span>`;
+
+                tickets[index] = ticket;
+                localStorage.setItem('tickets', JSON.stringify(tickets));
+
+                const row = document.querySelector(`[data-ticket-id="${editingTicketId}"]`);
+                row.querySelector('td:nth-child(1)').textContent = userName;
+                row.querySelector('td:nth-child(2)').textContent = ticketId;
+                row.querySelector('td:nth-child(3)').textContent = ticketType.charAt(0).toUpperCase() + ticketType.slice(1);
+                row.querySelector('td:nth-child(4)').innerHTML = ticket.status;
+
+                editingTicketId = null;
+                document.getElementById('formTitle').textContent = 'Add Ticket';
+                document.getElementById('ticketForm').reset();
+            }
+        }
+
+        function getTicketStatus(expirationDate) {
+            const now = new Date();
+            if (expirationDate > now) {
+                const timeLeft = calculateTimeLeft(expirationDate);
+                return `<span class="valid">Valid - Expires in ${timeLeft}</span>`;
+            } else {
+                return `<span class="expired">Expired</span>`;
+            }
+        }
+
+        function appendTicketToTable(ticket, status) {
+            const ticketList = document.getElementById('ticketList');
+            const row = document.createElement('tr');
+            row.setAttribute('data-ticket-id', ticket.ticketId);
+
+            const canRenew = new Date(ticket.expirationDate) < new Date();
+            const renewButton = ticket.ticketType === 'client' ? 
+                `<button class="renew-btn" onclick="renewTicket('${ticket.ticketId}')" ${!canRenew ? 'disabled' : ''}>Renew</button>` : '';
+
+            row.innerHTML = `
+                <td>${ticket.userName}</td>
+                <td>${ticket.ticketId}</td>
+                <td>${ticket.ticketType.charAt(0).toUpperCase() + ticket.ticketType.slice(1)}</td>
+                <td>${status}</td>
+                <td class="actions">
+                    <button class="edit-btn" onclick="editTicket('${ticket.ticketId}')">Edit</button>
+                    <button class="delete-btn" onclick="deleteTicket('${ticket.ticketId}')">Delete</button>
+                    ${renewButton}
+                </td>
+            `;
+            ticketList.appendChild(row);
+        }
+
+        function deleteTicket(ticketId) {
+            let tickets = JSON.parse(localStorage.getItem('tickets')) || [];
+            tickets = tickets.filter(ticket => ticket.ticketId !== ticketId);
+            localStorage.setItem('tickets', JSON.stringify(tickets));
+
+            const row = document.querySelector(`[data-ticket-id="${ticketId}"]`);
+            row.remove();
+        }
+
+        function renewTicket(ticketId) {
+            let tickets = JSON.parse(localStorage.getItem('tickets')) || [];
+            const index = tickets.findIndex(ticket => ticket.ticketId === ticketId);
+
+            if (index !== -1) {
+                const ticket = tickets[index];
+                const newExpirationDate = new Date(ticket.expirationDate);
+                newExpirationDate.setFullYear(newExpirationDate.getFullYear() + 3);
+                ticket.expirationDate = newExpirationDate;
+                ticket.status = getTicketStatus(ticket.expirationDate);
+
+                tickets[index] = ticket;
+                localStorage.setItem('tickets', JSON.stringify(tickets));
+
+                const row = document.querySelector(`[data-ticket-id="${ticketId}"]`);
+                row.querySelector('td:nth-child(4)').innerHTML = ticket.status;
+            }
+        }
+
+        function editTicket(ticketId) {
+            const tickets = JSON.parse(localStorage.getItem('tickets')) || [];
+            const ticket = tickets.find(ticket => ticket.ticketId === ticketId);
+
+            if (ticket) {
+                document.getElementById('userName').value = ticket.userName;
+                document.getElementById('ticketId').value = ticket.ticketId;
+                document.getElementById('ticketType').value = ticket.ticketType;
+                editingTicketId = ticketId;
+                document.getElementById('formTitle').textContent = 'Edit Ticket';
+            }
+        }
+
+        function loadTicketsFromLocalStorage() {
+            let tickets = JSON.parse(localStorage.getItem('tickets')) || [];
+            tickets.forEach(ticket => {
+                const status = ticket.ticketType === 'client' ? getTicketStatus(ticket.expirationDate) : `<span class="valid">No Expiry</span>`;
+                appendTicketToTable(ticket, status);
+            });
+        }
+
+        function calculateTimeLeft(expirationDate) {
+            const now = new Date();
+            const diff = expirationDate - now;
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            return days + ' days';
+        }
+    </script>
+</body>
+</html>
